@@ -1,6 +1,6 @@
 from django.db import models
 
-from ..users.models import User
+from users.models import User
 
 
 class Tag(models.Model):
@@ -8,9 +8,12 @@ class Tag(models.Model):
     name = models.CharField(
         max_length=30, blank=False,
         null=False, verbose_name='Название'
+        # наверное, должно быть уникальным
     )
-    color = models.CharField(blank=False, null=False,)
-    # поле color можно реализовать с помощью стороннего модуля на HexField
+    color = models.CharField(
+        max_length=10, blank=False,
+        null=False, verbose_name='Цвет в формате HEX'
+    )
     slug = models.SlugField(
         blank=False, null=False,
         unique=True,
@@ -29,10 +32,12 @@ class Ingredient(models.Model):
     name = models.CharField(
         max_length=100, blank=False,
         null=False, verbose_name='Название'
+        # наверное, должно быть уникальным
     )
     measurement_unit = models.CharField(
         max_length=50, blank=False,
         null=False, verbose_name='Единица измерения'
+        # наверное, должно быть уникальным
     )
 
     class Meta:
@@ -47,7 +52,7 @@ class Recipe(models.Model):
 
     tags = models.ManyToManyField(
         Tag, through='RecipeTag',
-        blank=False, null=False,
+        blank=False,
         verbose_name='Теги'
     )
     image = models.ImageField(
@@ -66,25 +71,16 @@ class Recipe(models.Model):
     cooking_time = models.PositiveSmallIntegerField(
         blank=False, null=False,
         verbose_name='Время приготовления (в минутах)'
-        # можно ли на уровне модели ограничить используемые числа?
     )
     ingredients = models.ManyToManyField(
         Ingredient, through='RecipeIngredient',
-        blank=False, null=False,
+        blank=False,
         verbose_name='Ингредиенты'
     )
     author = models.ForeignKey(
         User, on_delete=models.CASCADE,
         blank=False, null=False,
         verbose_name='Теги'
-    )
-    is_favorited = models.ManyToManyField(
-        User, through='Favorites',
-        verbose_name='Избранное'
-    )
-    is_in_shopping_cart = models.ManyToManyField(
-        User, through='ShoppingCart',
-        verbose_name='Список покупок'
     )
 
     class Meta:
@@ -95,7 +91,7 @@ class Recipe(models.Model):
         return self.name
 
 
-class BaseRecipeLink(models.Model):
+class BaseRecipeLinkTable(models.Model):
     """Base class containing recipe field with description."""
     recipe = models.ForeignKey(
         Recipe,
@@ -107,8 +103,8 @@ class BaseRecipeLink(models.Model):
         abstract = True
 
 
-class BaseRecipeUser(BaseRecipeLink):
-    """Base class inherited from BaseRecipeLink class.
+class BaseRecipeUser(BaseRecipeLinkTable):
+    """Base class inherited from BaseRecipeLinkTable class.
     Class contains description of user field."""
     user = models.ForeignKey(
         User,
@@ -123,7 +119,7 @@ class BaseRecipeUser(BaseRecipeLink):
         return f'{self.user} {self.recipe}'
 
 
-class RecipeTag(BaseRecipeLink):
+class RecipeTag(BaseRecipeLinkTable):
 
     tag = models.ForeignKey(
         Tag,
@@ -139,12 +135,12 @@ class RecipeTag(BaseRecipeLink):
         return f'{self.recipe} {self.tag}'
 
 
-class RecipeIngredient(BaseRecipeLink):
+class RecipeIngredient(BaseRecipeLinkTable):
 
     ingredient = models.ForeignKey(
         Ingredient,
         blank=False, null=False,
-        on_delete=models.PROTECT
+        on_delete=models.CASCADE
     )
     amount = models.PositiveSmallIntegerField(blank=False, null=False,)
 

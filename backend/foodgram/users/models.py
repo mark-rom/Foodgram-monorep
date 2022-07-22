@@ -50,6 +50,7 @@ class Subscribtion(models.Model):
         User,
         blank=False,
         null=False,
+        on_delete=models.CASCADE,
         related_name='follower',
         verbose_name='Подписчик'
     )
