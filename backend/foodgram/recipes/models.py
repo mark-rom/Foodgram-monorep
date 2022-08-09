@@ -7,8 +7,8 @@ class Tag(models.Model):
 
     name = models.CharField(
         max_length=30, blank=False,
-        null=False, verbose_name='Название'
-        # наверное, должно быть уникальным
+        null=False, verbose_name='Название',
+        unique=True
     )
     color = models.CharField(
         max_length=10, blank=False,
@@ -31,18 +31,25 @@ class Ingredient(models.Model):
 
     name = models.CharField(
         max_length=100, blank=False,
-        null=False, verbose_name='Название'
-        # наверное, должно быть уникальным
+        null=False, verbose_name='Название',
+        unique=True
+        # наверное, должно быть уникальным вместе с измерением
     )
     measurement_unit = models.CharField(
         max_length=50, blank=False,
         null=False, verbose_name='Единица измерения'
-        # наверное, должно быть уникальным
+        # наверное, должно быть уникальным вместе с именем
     )
 
     class Meta:
         verbose_name = ('Ингредиент')
         verbose_name_plural = ('Ингредиенты')
+        constraints = [
+            models.UniqueConstraint(
+                fields=['name', 'measurement_unit'],
+                name='unique_name_measurement'
+            )
+        ]
 
     def __str__(self):
         return self.name
@@ -80,7 +87,7 @@ class Recipe(models.Model):
     author = models.ForeignKey(
         User, on_delete=models.CASCADE,
         blank=False, null=False,
-        verbose_name='Теги'
+        verbose_name='Автор'
     )
 
     class Meta:
@@ -96,7 +103,8 @@ class BaseRecipeLinkTable(models.Model):
     recipe = models.ForeignKey(
         Recipe,
         blank=False, null=False,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name="%(class)s_related"
     )
 
     class Meta:
@@ -109,7 +117,8 @@ class BaseRecipeUser(BaseRecipeLinkTable):
     user = models.ForeignKey(
         User,
         blank=False, null=False,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name="%(class)s_related"
     )
 
     class Meta:
@@ -124,7 +133,8 @@ class RecipeTag(BaseRecipeLinkTable):
     tag = models.ForeignKey(
         Tag,
         blank=False, null=True,
-        on_delete=models.SET_NULL
+        on_delete=models.SET_NULL,
+        related_name='recipes'
     )
 
     class Meta:
@@ -140,7 +150,8 @@ class RecipeIngredient(BaseRecipeLinkTable):
     ingredient = models.ForeignKey(
         Ingredient,
         blank=False, null=False,
-        on_delete=models.CASCADE
+        on_delete=models.CASCADE,
+        related_name='recipes'
     )
     amount = models.PositiveSmallIntegerField(blank=False, null=False,)
 

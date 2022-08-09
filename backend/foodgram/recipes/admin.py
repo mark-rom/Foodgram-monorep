@@ -13,8 +13,19 @@ class IngredientAdmin(admin.ModelAdmin):
     list_display = ['pk', 'name', 'measurement_unit']
 
 
+class IngredientInline(admin.TabularInline):
+    model = models.RecipeIngredient
+    extra = 1
+
+
+class TagInline(admin.TabularInline):
+    model = models.RecipeTag
+    extra = 1
+
+
 class RecipeAdmin(admin.ModelAdmin):
     model = models.Recipe
+    inlines = (IngredientInline, TagInline)
     list_display = ['id', 'author',
                     'name', 'image',
                     'text', 'cooking_time'

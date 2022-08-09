@@ -1,12 +1,9 @@
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
 from rest_framework import mixins
 
-from recipes.models import Tag, Ingredient, Recipe
-from users.models import User
-from .serializers import (TagSerializer, IngredientSerializer,
-                          GetRecipeSerializer, WriteRecipeSerializer,
-                          UserSerializer
-                          )
+from recipes import models
+from users.models import User, Subscribtion
+from api import serializers
 
 
 class BaseListRetrieveViewSet(
@@ -17,25 +14,38 @@ class BaseListRetrieveViewSet(
     pass
 
 
+class BaseCreateDestroyViewSet(
+    mixins.CreateModelMixin,
+    mixins.DestroyModelMixin,
+    GenericViewSet
+):
+    pass
+
+
 class UserViewSet(ModelViewSet):
     queryset = User.objects.all()
-    serializer_class = UserSerializer
+    serializer_class = serializers.UserSerializer
 
 
 class TagViewSet(BaseListRetrieveViewSet):
-    queryset = Tag.objects.all()
-    serializer_class = TagSerializer
+    queryset = models.Tag.objects.all()
+    serializer_class = serializers.TagSerializer
 
 
 class IngredientViewSet(BaseListRetrieveViewSet):
-    queryset = Ingredient.objects.all()
-    serializer_class = IngredientSerializer
+    queryset = models.Ingredient.objects.all()
+    serializer_class = serializers.IngredientSerializer
 
 
 class RecipeViewSet(ModelViewSet):
-    queryset = Recipe.objects.all()
+    queryset = models.Recipe.objects.all()
 
     def get_serializer_class(self):
         if self.action in ('list', 'retrieve'):
-            return GetRecipeSerializer
-        return WriteRecipeSerializer
+            return serializers.ReadRecipeSerializer
+        return serializers.WriteRecipeSerializer
+
+
+class SubscribtionViewSet(BaseCreateDestroyViewSet):
+    queryset = Subscribtion.objects.all()
+    serializer_class = serializers.Subscribtion
