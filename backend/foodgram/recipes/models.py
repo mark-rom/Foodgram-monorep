@@ -168,6 +168,7 @@ class ShoppingCart(BaseRecipeUser):
     class Meta:
         verbose_name = ('Список покупок')
         verbose_name_plural = ('Списки покупок')
+        # нужен констрейнт на оригинальность сочетания полей
 
 
 class Favorites(BaseRecipeUser):
@@ -175,3 +176,4 @@ class Favorites(BaseRecipeUser):
     class Meta:
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранное'
+        # нужен констрейнт на оригинальность сочетания полей

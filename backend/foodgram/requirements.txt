@@ -13,6 +13,7 @@ DjangoHexadecimalField==0.0.3
 djangorestframework==3.13.1
 djangorestframework-simplejwt==4.8.0
 djoser==2.1.0
+drf-base64==2.0
 flake8==4.0.1
 idna==3.3
 itypes==1.2.0

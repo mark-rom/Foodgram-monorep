@@ -23,9 +23,22 @@ class TagInline(admin.TabularInline):
     extra = 1
 
 
+class ShoppingCartInlite(admin.TabularInline):
+    model = models.ShoppingCart
+    extra = 1
+
+
+class FavoritesInlite(admin.TabularInline):
+    model = models.Favorites
+    extra = 1
+
+
 class RecipeAdmin(admin.ModelAdmin):
     model = models.Recipe
-    inlines = (IngredientInline, TagInline)
+    inlines = (
+        IngredientInline, TagInline,
+        ShoppingCartInlite, FavoritesInlite
+    )
     list_display = ['id', 'author',
                     'name', 'image',
                     'text', 'cooking_time'
