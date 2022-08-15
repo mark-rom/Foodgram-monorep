@@ -216,13 +216,21 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
         return serializer.data
 
 
-class ShoppingCartSerializer(serializers.ModelSerializer):
+class ShortRecipeSerializer(serializers.ModelSerializer):
 
-    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    # подумать над представлением ссылки на картинку
+    # сейчас так: "/media/recipes/a2ace521-614e-4f6f-a375-7afa68840858.png"
+    # должно быть: "http://foodgram.example.org/media/recipes/a2ace521-614e-4f6f-a375-7afa68840858.png"
+    class Meta:
+        model = models.Recipe
+        fields = ['id', 'name', 'image', 'cooking_time']
+
+
+class ShoppingCartSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.ShoppingCart
-        fields = ['user']
+        fields = ['user', 'recipe']
         # Достать из-под комментов, когда добавлю в модель валидатор
         #
         # validators = [
@@ -233,12 +241,18 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
         #     )
         # ]
 
-    def create(self, validated_data):
 
-        recipe_id = self.context['view'].kwargs.get('recipe_id')
-        recipe = get_object_or_404(models.Recipe, id=recipe_id)
+class FavoriteSerializer(serializers.ModelSerializer):
 
-        return models.ShoppingCart.objects.create(
-            recipe=recipe,
-            user=validated_data.get('user')
-        )
+    class Meta:
+        model = models.Favorites
+        fields = ['user', 'recipe']
+        # Достать из-под комментов, когда добавлю в модель валидатор
+        #
+        # validators = [
+        #     serializers.UniqueTogetherValidator(
+        #         queryset=models.ShoppingCart.objects.all(),
+        #         fields=['user', 'recipe'],
+        #         message='The recipe is in the shopping cart already.'
+        #     )
+        # ]

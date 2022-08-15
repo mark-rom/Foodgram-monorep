@@ -1,9 +1,10 @@
 from rest_framework.viewsets import ModelViewSet, GenericViewSet
-from rest_framework import mixins
+from rest_framework import mixins, response, status
 from django.shortcuts import get_object_or_404
 from rest_framework.decorators import action
 from django.db.models import Sum
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse
+from django.core.exceptions import ObjectDoesNotExist
 
 from recipes import models
 from users.models import User, Subscribtion
@@ -52,6 +53,33 @@ class RecipeViewSet(ModelViewSet):
             return serializers.ReadRecipeSerializer
         return serializers.WriteRecipeSerializer
 
+    def __add_recipe(self, recipe, user, serializer):
+        """Базовый метод для добавления рецепта в корзину или избранное."""
+
+        serializer = serializer(data={'user': user.id, 'recipe': recipe.id})
+        serializer.is_valid(raise_exception=True)
+        serializer.save(recipe=recipe, user=user)
+
+        serializer = serializers.ShortRecipeSerializer(recipe)
+
+        return response.Response(
+            serializer.data, status=status.HTTP_201_CREATED
+        )
+
+    def __remove_recipe(self, recipe, related_manager):
+        """Базовый метод для удаления рецепта из корзины или избранного."""
+
+        try:
+            instance = related_manager.get(recipe=recipe)
+
+        except ObjectDoesNotExist:
+            return response.Response(
+                {"no_recipe": "Вы не доавляли этот рецепт"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        instance.delete()
+        return response.Response(status=status.HTTP_204_NO_CONTENT)
+
     @action(methods=['get'], detail=False)
     def download_shopping_cart(self, request):
         user = request.user
@@ -75,29 +103,32 @@ class RecipeViewSet(ModelViewSet):
         )
 
     @action(methods=['post', 'delete'], detail=True)
-    def shopping_cart(self, request):
-        recipe = self.get_object()
+    def shopping_cart(self, request, pk):
+
+        recipe = get_object_or_404(models.Recipe, id=pk)
         user = request.user
 
         if request.method == 'DELETE':
-            shopping_cart_instance = get_object_or_404(models.ShoppingCart, recipe=recipe, user=user)
-            shopping_cart_instance.delete()
-            return HttpResponse()
-        sh_c, content = models.ShoppingCart.objects.get_or_create(recipe=recipe, user=user)
-        pass
+            return self.__remove_recipe(recipe, user.shoppingcart_related)
+
+        return self.__add_recipe(
+            recipe, user, serializers.ShoppingCartSerializer
+        )
+
+    @action(methods=['post', 'delete'], detail=True)
+    def favorite(self, request, pk):
+
+        recipe = get_object_or_404(models.Recipe, id=pk)
+        user = request.user
+
+        if request.method == 'DELETE':
+            return self.__remove_recipe(recipe, user.favorites_related)
+
+        return self.__add_recipe(
+            recipe, user, serializers.FavoriteSerializer
+        )
 
 
 class SubscribtionViewSet(BaseCreateDestroyViewSet):
     queryset = Subscribtion.objects.all()
     serializer_class = serializers.Subscribtion
-
-
-class ShoppingCartViewSet(BaseCreateDestroyViewSet):
-    serializer_class = serializers.ShoppingCartSerializer
-
-    def get_queryset(self):
-        recipe_id = self.kwargs.get('recipe_id')
-        return get_object_or_404(
-            models.Recipe.objects.select_related('shoppingcart_related'),
-            pk=recipe_id
-        )

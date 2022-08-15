@@ -45,6 +45,18 @@ class RecipeAdmin(admin.ModelAdmin):
                     ]
 
 
+class ShoppongCartAdmin(admin.ModelAdmin):
+    model = models.ShoppingCart
+    list_display = ['id', 'user', 'recipe']
+
+
+class FavoritesAdmin(admin.ModelAdmin):
+    model = models.Favorites
+    list_display = ['id', 'user', 'recipe']
+
+
 admin.site.register(models.Tag, TagAdmin)
 admin.site.register(models.Ingredient, IngredientAdmin)
 admin.site.register(models.Recipe, RecipeAdmin)
+admin.site.register(models.ShoppingCart, ShoppongCartAdmin)
+admin.site.register(models.Favorites, FavoritesAdmin)
