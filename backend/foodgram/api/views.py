@@ -68,6 +68,10 @@ class RecipeViewSet(ModelViewSet):
             return serializers.ReadRecipeSerializer
         return serializers.WriteRecipeSerializer
 
+    def perform_create(self, serializer):
+        serializer.is_valid(raise_exception=True)
+        serializer.save(author=self.request.user)
+
     def __add_recipe(self, recipe, user, serializer):
         """Базовый метод для добавления рецепта в корзину или избранное."""
 

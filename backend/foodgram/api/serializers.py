@@ -146,6 +146,13 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
         fields = ['tags', 'ingredients', 'name', 'image', 'text',
                   'cooking_time'
                   ]
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=models.Recipe.objects.all(),
+                fields=['name', 'text'],
+                message='Recipe with same name or text already exists.'
+            )
+        ]
 
     def create(self, validated_data):
 
