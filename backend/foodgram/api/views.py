@@ -1,15 +1,20 @@
-from rest_framework.viewsets import ModelViewSet, GenericViewSet
-from rest_framework import mixins, response, status
-from django.shortcuts import get_object_or_404
-from rest_framework.decorators import action
+from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
 from django.http import FileResponse
-from django.core.exceptions import ObjectDoesNotExist
+from django.shortcuts import get_object_or_404
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import filters, mixins, response, status
+from rest_framework.decorators import action
+from rest_framework.permissions import (IsAuthenticated,
+                                        IsAuthenticatedOrReadOnly)
+from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from recipes import models
-from users.models import User, Subscribtion
-from api import serializers
-from api.shopping_list_pdf import get_pdf
+from users.models import Subscribtion, User
+
+from . import pagination, permissions, serializers
+from .filters import RecipeFilter
+from .shopping_list_pdf import get_pdf
 
 
 class BaseListRetrieveViewSet(
@@ -36,17 +41,27 @@ class UserViewSet(ModelViewSet):
 class TagViewSet(BaseListRetrieveViewSet):
     queryset = models.Tag.objects.all()
     serializer_class = serializers.TagSerializer
+    pagination_class = None
 
 
 class IngredientViewSet(BaseListRetrieveViewSet):
     queryset = models.Ingredient.objects.all()
     serializer_class = serializers.IngredientSerializer
+    pagination_class = None
+    filter_backends = [filters.SearchFilter]
+    search_fields = ['^name']
 
 
 class RecipeViewSet(ModelViewSet):
     queryset = models.Recipe.objects.prefetch_related(
         'ingredients', 'tags'
     ).all()
+    permission_classes = [
+        IsAuthenticatedOrReadOnly,
+        permissions.AuthorOrReadOnly,
+    ]
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = RecipeFilter
 
     def get_serializer_class(self):
         if self.action in ('list', 'retrieve'):
@@ -80,7 +95,10 @@ class RecipeViewSet(ModelViewSet):
         instance.delete()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
 
-    @action(methods=['get'], detail=False)
+    @action(
+        methods=['get'], detail=False,
+        permission_classes=[IsAuthenticated]
+    )
     def download_shopping_cart(self, request):
         user = request.user
 
@@ -102,7 +120,10 @@ class RecipeViewSet(ModelViewSet):
             filename='shopping_list', content_type='application/pdf'
         )
 
-    @action(methods=['post', 'delete'], detail=True)
+    @action(
+        methods=['post', 'delete'],
+        detail=True, permission_classes=[IsAuthenticated]
+    )
     def shopping_cart(self, request, pk):
 
         recipe = get_object_or_404(models.Recipe, id=pk)
@@ -115,7 +136,10 @@ class RecipeViewSet(ModelViewSet):
             recipe, user, serializers.ShoppingCartSerializer
         )
 
-    @action(methods=['post', 'delete'], detail=True)
+    @action(
+        methods=['post', 'delete'], detail=True,
+        permission_classes=[IsAuthenticated]
+    )
     def favorite(self, request, pk):
 
         recipe = get_object_or_404(models.Recipe, id=pk)
@@ -132,3 +156,4 @@ class RecipeViewSet(ModelViewSet):
 class SubscribtionViewSet(BaseCreateDestroyViewSet):
     queryset = Subscribtion.objects.all()
     serializer_class = serializers.Subscribtion
+    pagination_class = pagination.PageNumberLimitPagination

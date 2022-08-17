@@ -1,6 +1,6 @@
+from django.conf import settings
 from fpdf import FPDF
 
-from django.conf import settings
 pdf = FPDF(orientation='P', format='A4')
 
 
