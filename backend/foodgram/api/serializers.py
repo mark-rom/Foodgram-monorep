@@ -1,10 +1,11 @@
 from re import fullmatch
-from rest_framework import serializers
+
+from django.shortcuts import get_object_or_404
 from drf_base64.fields import Base64ImageField
+from rest_framework import serializers
 
 from recipes import models
-from users.models import User, Subscribtion
-from django.shortcuts import get_object_or_404
+from users.models import Subscribtion, User
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
@@ -148,13 +149,10 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
 
-        user = self.context['request'].user
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
 
-        new_recipe = models.Recipe.objects.create(
-            author=user, **validated_data
-        )
+        new_recipe = models.Recipe.objects.create(**validated_data)
 
         # Вот это нужно делать в одной "автономной" транзакции
         # также подумать над созданием объектов через bulk_create
@@ -218,9 +216,6 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
 
 class ShortRecipeSerializer(serializers.ModelSerializer):
 
-    # подумать над представлением ссылки на картинку
-    # сейчас так: "/media/recipes/a2ace521-614e-4f6f-a375-7afa68840858.png"
-    # должно быть: "http://foodgram.example.org/media/recipes/a2ace521-614e-4f6f-a375-7afa68840858.png"
     class Meta:
         model = models.Recipe
         fields = ['id', 'name', 'image', 'cooking_time']
@@ -231,15 +226,14 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.ShoppingCart
         fields = ['user', 'recipe']
-        # Достать из-под комментов, когда добавлю в модель валидатор
-        #
-        # validators = [
-        #     serializers.UniqueTogetherValidator(
-        #         queryset=models.ShoppingCart.objects.all(),
-        #         fields=['user', 'recipe'],
-        #         message='The recipe is in the shopping cart already.'
-        #     )
-        # ]
+
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=models.ShoppingCart.objects.all(),
+                fields=['user', 'recipe'],
+                message='The recipe is in the shopping cart already.'
+            )
+        ]
 
 
 class FavoriteSerializer(serializers.ModelSerializer):
@@ -247,12 +241,11 @@ class FavoriteSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Favorites
         fields = ['user', 'recipe']
-        # Достать из-под комментов, когда добавлю в модель валидатор
-        #
-        # validators = [
-        #     serializers.UniqueTogetherValidator(
-        #         queryset=models.ShoppingCart.objects.all(),
-        #         fields=['user', 'recipe'],
-        #         message='The recipe is in the shopping cart already.'
-        #     )
-        # ]
+
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=models.Favorites.objects.all(),
+                fields=['user', 'recipe'],
+                message='The recipe is in favorites already.'
+            )
+        ]

@@ -33,12 +33,10 @@ class Ingredient(models.Model):
         max_length=100, blank=False,
         null=False, verbose_name='Название',
         unique=True
-        # наверное, должно быть уникальным вместе с измерением
     )
     measurement_unit = models.CharField(
         max_length=50, blank=False,
         null=False, verbose_name='Единица измерения'
-        # наверное, должно быть уникальным вместе с именем
     )
 
     class Meta:
@@ -89,10 +87,15 @@ class Recipe(models.Model):
         blank=False, null=False,
         verbose_name='Автор'
     )
+    pub_date = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name='Дата публикации'
+    )
 
     class Meta:
         verbose_name = ('Рецепт')
         verbose_name_plural = ('Рецепты')
+        ordering = ['-pub_date']
 
     def __str__(self):
         return self.name
@@ -168,7 +171,12 @@ class ShoppingCart(BaseRecipeUser):
     class Meta:
         verbose_name = ('Список покупок')
         verbose_name_plural = ('Списки покупок')
-        # нужен констрейнт на оригинальность сочетания полей
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'recipe'],
+                name='unique_user_recipe_shopping_cart'
+            )
+        ]
 
 
 class Favorites(BaseRecipeUser):
@@ -176,4 +184,9 @@ class Favorites(BaseRecipeUser):
     class Meta:
         verbose_name = 'Избранное'
         verbose_name_plural = 'Избранное'
-        # нужен констрейнт на оригинальность сочетания полей
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'recipe'],
+                name='unique_user_recipe_favorites'
+            )
+        ]
