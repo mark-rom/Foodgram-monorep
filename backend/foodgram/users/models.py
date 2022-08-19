@@ -45,7 +45,7 @@ class User(AbstractUser):
         return self.username
 
 
-class Subscribtion(models.Model):
+class Subscription(models.Model):
     user = models.ForeignKey(
         User,
         blank=False,
@@ -62,10 +62,13 @@ class Subscribtion(models.Model):
         related_name='following',
         verbose_name='Автор'
     )
+    sub_date = models.DateTimeField(
+        'Дата подписки', auto_now_add=True)
 
     class Meta:
         verbose_name = 'Подписка'
         verbose_name_plural = 'Подписки'
+        ordering = ['-sub_date']
         constraints = [
             models.UniqueConstraint(
                 fields=['user', 'following'],
