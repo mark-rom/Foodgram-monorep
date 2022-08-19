@@ -5,14 +5,7 @@ from drf_base64.fields import Base64ImageField
 from rest_framework import serializers
 
 from recipes import models
-from users.models import Subscribtion, User
-
-
-class SubscriptionSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Subscribtion
-        fields = ['user', 'following']
+from users.models import Subscription, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -256,3 +249,65 @@ class FavoriteSerializer(serializers.ModelSerializer):
                 message='The recipe is in favorites already.'
             )
         ]
+
+
+class UserSubscriptionSerializer(serializers.ModelSerializer):
+
+    email = serializers.ReadOnlyField(source='following.email')
+    id = serializers.ReadOnlyField(source='following.id')
+    username = serializers.ReadOnlyField(source='following.username')
+    first_name = serializers.ReadOnlyField(source='following.first_name')
+    last_name = serializers.ReadOnlyField(source='following.last_name')
+
+    is_subscribed = serializers.SerializerMethodField(
+        method_name='get_is_subscribed'
+    )
+    recipes = ShortRecipeSerializer(
+        source='following.recipes', many=True, read_only=True
+    )
+    recipes_count = serializers.SerializerMethodField(
+        method_name='get_recipes_count'
+    )
+
+    class Meta:
+        model = Subscription
+        fields = ['email', 'id', 'username',
+                  'first_name', 'last_name', 'is_subscribed',
+                  'recipes', 'recipes_count'
+                  ]
+
+    def get_is_subscribed(self, obj):
+        return obj.user == self.context['request'].user
+
+    def get_recipes_count(self, obj):
+        return obj.following.recipes.count()
+
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+
+    user = serializers.HiddenField(default=serializers.CurrentUserDefault())
+    following = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all()
+    )
+
+    class Meta:
+        model = Subscription
+        fields = ['user', 'following']
+        validators = [
+            serializers.UniqueTogetherValidator(
+                queryset=Subscription.objects.all(),
+                fields=['user', 'following'],
+                message='Вы уже подписаны на этого пользователя'
+            )
+        ]
+
+    def validate(self, data):
+        if self.context['request'].user == data['following']:
+            raise serializers.ValidationError(
+                'Нельзя подписаться на себя')
+        return data
+
+    def to_representation(self, value):
+
+        serializer = UserSubscriptionSerializer(value, context=self.context)
+        return serializer.data

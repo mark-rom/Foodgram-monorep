@@ -3,6 +3,7 @@ from django.db.models import Sum
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
+from djoser.views import UserViewSet
 from rest_framework import filters, mixins, response, status
 from rest_framework.decorators import action
 from rest_framework.permissions import (IsAuthenticated,
@@ -10,9 +11,9 @@ from rest_framework.permissions import (IsAuthenticated,
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from recipes import models
-from users.models import Subscribtion, User
+from users.models import Subscription, User
 
-from . import pagination, permissions, serializers
+from . import permissions, serializers
 from .filters import RecipeFilter
 from .shopping_list_pdf import get_pdf
 
@@ -25,17 +26,46 @@ class BaseListRetrieveViewSet(
     pass
 
 
-class BaseCreateDestroyViewSet(
-    mixins.CreateModelMixin,
-    mixins.DestroyModelMixin,
-    GenericViewSet
-):
-    pass
-
-
-class UserViewSet(ModelViewSet):
+class CustomUserViewSet(UserViewSet):
     queryset = User.objects.all()
     serializer_class = serializers.UserSerializer
+
+    @action(methods=['get'], detail=False)
+    def subscriptions(self, request):
+        user_following_qs = request.user.follower.all()
+        serializer = serializers.UserSubscriptionSerializer(
+            user_following_qs, many=True,
+            context={
+                'request': self.request,
+                'format': self.format_kwarg,
+                'view': self
+            }
+        )
+
+        return response.Response(
+            serializer.data, status=status.HTTP_200_OK
+        )
+
+    @action(methods=['post', 'delete'], detail=True)
+    def subscribe(self, request, id):
+
+        if request.method == 'DELETE':
+            instance = get_object_or_404(
+                Subscription, user=request.user, following_id=id
+            )
+            instance.delete()
+            return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+        serializer = serializers.SubscriptionSerializer(
+            data={'following': id}, context={'request': self.request}
+        )
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save(user=request.user)
+
+        return response.Response(
+            serializer.data, status=status.HTTP_201_CREATED
+        )
 
 
 class TagViewSet(BaseListRetrieveViewSet):
@@ -69,6 +99,7 @@ class RecipeViewSet(ModelViewSet):
         return serializers.WriteRecipeSerializer
 
     def perform_create(self, serializer):
+        # удалить .is_valid()
         serializer.is_valid(raise_exception=True)
         serializer.save(author=self.request.user)
 
@@ -155,9 +186,3 @@ class RecipeViewSet(ModelViewSet):
         return self.__add_recipe(
             recipe, user, serializers.FavoriteSerializer
         )
-
-
-class SubscribtionViewSet(BaseCreateDestroyViewSet):
-    queryset = Subscribtion.objects.all()
-    serializer_class = serializers.Subscribtion
-    pagination_class = pagination.PageNumberLimitPagination
