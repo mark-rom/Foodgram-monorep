@@ -4,14 +4,15 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
-from rest_framework import filters, mixins, response, status
+from rest_framework import filters, response, status
 from rest_framework.decorators import action
+from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import (IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from recipes import models
-from users.models import Subscription, User
+from users.models import User
 
 from . import permissions, serializers
 from .filters import RecipeFilter
@@ -19,45 +20,49 @@ from .shopping_list_pdf import get_pdf
 
 
 class BaseListRetrieveViewSet(
-    mixins.ListModelMixin,
-    mixins.RetrieveModelMixin,
+    ListModelMixin, RetrieveModelMixin,
     GenericViewSet
 ):
     pass
 
 
 class CustomUserViewSet(UserViewSet):
-    queryset = User.objects.all()
-    serializer_class = serializers.UserSerializer
 
-    @action(methods=['get'], detail=False)
+    @action(
+        methods=['get'], detail=False,
+        filter_backends=[DjangoFilterBackend],
+        permission_classes=[IsAuthenticated]
+        )
     def subscriptions(self, request):
+        # здесь можно сделать select_related, наверное
+        # для поля following.recipes
         user_following_qs = request.user.follower.all()
+        qs = self.paginate_queryset(user_following_qs)
         serializer = serializers.UserSubscriptionSerializer(
-            user_following_qs, many=True,
+            qs, many=True,
             context={
                 'request': self.request,
                 'format': self.format_kwarg,
                 'view': self
             }
         )
+        return self.get_paginated_response(serializer.data)
 
-        return response.Response(
-            serializer.data, status=status.HTTP_200_OK
-        )
-
-    @action(methods=['post', 'delete'], detail=True)
+    @action(
+        methods=['post', 'delete'], detail=True,
+        permission_classes=[IsAuthenticated]
+    )
     def subscribe(self, request, id):
 
+        following = get_object_or_404(User, pk=id)
+
         if request.method == 'DELETE':
-            instance = get_object_or_404(
-                Subscription, user=request.user, following_id=id
-            )
+            instance = following.follower.filter(user=request.user)
             instance.delete()
             return response.Response(status=status.HTTP_204_NO_CONTENT)
 
         serializer = serializers.SubscriptionSerializer(
-            data={'following': id}, context={'request': self.request}
+            data={'following': following.id}, context={'request': self.request}
         )
 
         serializer.is_valid(raise_exception=True)

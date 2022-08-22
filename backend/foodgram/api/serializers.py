@@ -262,9 +262,7 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
     is_subscribed = serializers.SerializerMethodField(
         method_name='get_is_subscribed'
     )
-    recipes = ShortRecipeSerializer(
-        source='following.recipes', many=True, read_only=True
-    )
+    recipes = serializers.SerializerMethodField(method_name='get_recipes')
     recipes_count = serializers.SerializerMethodField(
         method_name='get_recipes_count'
     )
@@ -281,6 +279,15 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
 
     def get_recipes_count(self, obj):
         return obj.following.recipes.count()
+
+    def get_recipes(self, obj):
+        request = self.context['request']
+        recipes_limit = request.query_params.get('recipes_limit')
+        if not recipes_limit:
+            recipes = obj.following.recipes.all()
+        else:
+            recipes = obj.following.recipes.all()[:int(recipes_limit)]
+        return ShortRecipeSerializer(recipes, many=True, read_only=True).data
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
