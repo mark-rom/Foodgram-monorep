@@ -4,15 +4,16 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
-from rest_framework import filters, response, status
+from rest_framework import response, status
 from rest_framework.decorators import action
+from rest_framework.filters import SearchFilter
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import (IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from recipes import models
-from users.models import User
+from users.models import User, Subscription
 
 from . import permissions, serializers
 from .filters import RecipeFilter
@@ -26,7 +27,7 @@ class BaseListRetrieveViewSet(
     pass
 
 
-class CustomUserViewSet(UserViewSet):
+class FoodgramUserViewSet(UserViewSet):
 
     @action(
         methods=['get'], detail=False,
@@ -57,12 +58,23 @@ class CustomUserViewSet(UserViewSet):
         following = get_object_or_404(User, pk=id)
 
         if request.method == 'DELETE':
-            instance = following.follower.filter(user=request.user)
-            instance.delete()
-            return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+            instance = Subscription.objects.filter(
+                user=request.user, following=following
+            )
+
+            if instance.exists():
+
+                instance.delete()
+                return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+            return response.Response(
+                {"error": "Вы не были подписаны на этого пользователя"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         serializer = serializers.SubscriptionSerializer(
-            data={'following': following.id}, context={'request': self.request}
+            data={'following': id}, context={'request': self.request}
         )
 
         serializer.is_valid(raise_exception=True)
@@ -83,7 +95,7 @@ class IngredientViewSet(BaseListRetrieveViewSet):
     queryset = models.Ingredient.objects.all()
     serializer_class = serializers.IngredientSerializer
     pagination_class = None
-    filter_backends = [filters.SearchFilter]
+    filter_backends = [SearchFilter]
     search_fields = ['^name']
 
 

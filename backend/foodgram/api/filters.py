@@ -10,9 +10,6 @@ class RecipeFilter(filters.FilterSet):
         to_field_name='slug',
         queryset=models.Tag.objects.all()
     )
-    author = filters.CharFilter(
-        field_name='author__username', lookup_expr='iexact'
-        )
     is_favorited = filters.BooleanFilter(
         field_name='is_favorited',
         method='filter_is_favorited'

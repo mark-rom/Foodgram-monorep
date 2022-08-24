@@ -20,12 +20,13 @@ class UserSerializer(serializers.ModelSerializer):
 
     def get_is_subscribed(self, obj):
 
-        # текущий пользователь
         user = self.context['request'].user
 
         if user.is_authenticated:
-            # queryset со всеми авторами, на которых подписан юзер
-            following = user.following.all().values('id')
+            following = user.follower.all().values_list(
+                'following_id', flat=True
+            )
+
             return obj.pk in following
 
         return False
@@ -293,9 +294,7 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
 class SubscriptionSerializer(serializers.ModelSerializer):
 
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    following = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.all()
-    )
+    following = UserSerializer()
 
     class Meta:
         model = Subscription
