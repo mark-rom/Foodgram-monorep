@@ -1,5 +1,7 @@
 from re import fullmatch
+from typing import List
 
+from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_base64.fields import Base64ImageField
 from rest_framework import serializers
@@ -19,6 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
                   ]
 
     def get_is_subscribed(self, obj):
+        """Метод проверки наличия подписки на пользователя."""
 
         user = self.context['request'].user
 
@@ -39,9 +42,9 @@ class TagSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'color', 'slug']
 
         def validate(self, data):
-            """Check if color is HEX-color"""
+            """Проверка, что цвет представлен в формате HEX."""
             if not fullmatch('#[0-9A-F]{6}', data['color']):
-                raise serializers.ValidationError('Color must be HEX-color')
+                raise serializers.ValidationError('Цвет должен быть в HEX.')
             return data
 
 
@@ -107,8 +110,7 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
                   ]
 
     def get_is_favorited(self, obj):
-        """Примерный вид функции вхождения в список избранного.
-        Подлежит доработке."""
+        """Метод проверки наличия рецепта в избранном."""
 
         user = self.context['request'].user
 
@@ -118,8 +120,7 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
         return False
 
     def get_is_in_shopping_cart(self, obj):
-        """Примерный вид функции вхождения в список покупок.
-        Подлежит доработке."""
+        """Метод проверки наличия рецепта в списке покупок."""
 
         user = self.context['request'].user
 
@@ -144,10 +145,29 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
             serializers.UniqueTogetherValidator(
                 queryset=models.Recipe.objects.all(),
                 fields=['name', 'text'],
-                message='Recipe with same name or text already exists.'
+                message='Рецепт с таким названием или текстом уже доступен.'
             )
         ]
 
+    def _ingredietns_bulk_create(
+        self, recipe: models.Recipe, ingredients: List
+    ) -> None:
+
+        bulk_list = [None] * len(ingredients)
+
+        for num, ingredient in enumerate(ingredients):
+            new_instance = models.RecipeIngredient(
+                recipe=recipe,
+                ingredient=get_object_or_404(
+                    models.Ingredient, id=ingredient.get('id')
+                ),
+                amount=ingredient.get('amount')
+            )
+            bulk_list[num] = new_instance
+
+        models.RecipeIngredient.objects.bulk_create(bulk_list)
+
+    @transaction.atomic
     def create(self, validated_data):
 
         ingredients = validated_data.pop('ingredients')
@@ -155,29 +175,26 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
 
         new_recipe = models.Recipe.objects.create(**validated_data)
 
-        # Вот это нужно делать в одной "автономной" транзакции
-        # также подумать над созданием объектов через bulk_create
-        for ingredient in ingredients:
-            models.RecipeIngredient.objects.create(
-                recipe=new_recipe,
-                ingredient=get_object_or_404(
-                    models.Ingredient, id=ingredient.get('id')
-                ),
-                amount=ingredient.get('amount')
-            )
+        bulk_list = [None] * len(ingredients)
 
-        for tag in tags:
-            models.RecipeTag.objects.create(
+        self._ingredietns_bulk_create(new_recipe, ingredients)
+
+        bulk_list = [None] * len(tags)
+
+        for num, tag in enumerate(tags):
+            new_instance = models.RecipeTag(
                 recipe=new_recipe,
                 tag=get_object_or_404(models.Tag, id=tag)
             )
-        # Вот до сюда
+            bulk_list[num] = new_instance
+
+        models.RecipeTag.objects.bulk_create(bulk_list)
 
         return new_recipe
 
+    @transaction.atomic
     def update(self, instance, validated_data):
 
-        tag_list = []
         tags = validated_data.pop('tags')
         ingredients = validated_data.pop('ingredients')
 
@@ -185,34 +202,46 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
         # также подумать над созданием объектов через bulk_create
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-
         instance.save()
 
-        recipe_ingredients = instance.recipeingredient_related.all()
-        recipe_ingredients.delete()
+        instance.recipeingredient_related.all().delete()
 
-        for ingredient in ingredients:
-            models.RecipeIngredient.objects.create(
-                recipe=instance,
-                ingredient=get_object_or_404(
-                    models.Ingredient, id=ingredient.get('id')
-                ),
-                amount=ingredient.get('amount')
-            )
+        self._ingredietns_bulk_create(instance, ingredients)
 
-        for tag in tags:
+        bulk_list = [None] * len(tags)
+
+        for num, tag in enumerate(tags):
             new_tag = get_object_or_404(models.Tag, id=tag)
-            tag_list.append(new_tag)
+            bulk_list[num] = new_tag
 
-        instance.tags.set(tag_list)
+        instance.tags.set(bulk_list)
         # Вот до сюда
 
-        return instance
+        return super().update(
+            instance=instance, validated_data=validated_data
+        )
 
     def to_representation(self, value):
 
         serializer = ReadRecipeSerializer(value, context=self.context)
         return serializer.data
+
+    def validate(self, attrs):
+
+        try:
+            ingredients = attrs['ingredients']
+        except KeyError:
+            raise serializers.ValidationError(
+                'Не добавлены ингредиенты.'
+            )
+
+        for ingredient in ingredients:
+            if ingredient['amount'] < 1:
+                raise serializers.ValidationError(
+                    'Количество ингредиента не может быть меньше 1.'
+                )
+
+        return super().validate(attrs)
 
 
 class ShortRecipeSerializer(serializers.ModelSerializer):
@@ -232,7 +261,7 @@ class ShoppingCartSerializer(serializers.ModelSerializer):
             serializers.UniqueTogetherValidator(
                 queryset=models.ShoppingCart.objects.all(),
                 fields=['user', 'recipe'],
-                message='The recipe is in the shopping cart already.'
+                message='Рецепт уже в списке покупок.'
             )
         ]
 
@@ -247,7 +276,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
             serializers.UniqueTogetherValidator(
                 queryset=models.Favorites.objects.all(),
                 fields=['user', 'recipe'],
-                message='The recipe is in favorites already.'
+                message='Рецепт уже в избранном.'
             )
         ]
 
@@ -294,7 +323,9 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
 class SubscriptionSerializer(serializers.ModelSerializer):
 
     user = serializers.HiddenField(default=serializers.CurrentUserDefault())
-    following = UserSerializer()
+    following = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all()
+    )
 
     class Meta:
         model = Subscription

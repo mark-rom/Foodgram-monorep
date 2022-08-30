@@ -4,6 +4,10 @@ from recipes import models
 
 
 class RecipeFilter(filters.FilterSet):
+    """Фильр для вьюсета рецептов.
+    Реализована фильтрация по id автора, тегам рецепта,
+    нахождению рецепта в избранном или списке покупок.
+    """
 
     tags = filters.ModelMultipleChoiceFilter(
         field_name='tags__slug',
@@ -28,3 +32,17 @@ class RecipeFilter(filters.FilterSet):
     class Meta:
         model = models.Recipe
         fields = ['author']
+
+
+class IngredientSearchFilter(filters.FilterSet):
+    """Фильр для вьюсета ингредиентов.
+    Реализована фильтрация по точному вхождению в начало названия.
+    """
+
+    name = filters.CharFilter(
+        field_name="name", lookup_expr='istartswith'
+    )
+
+    class Meta:
+        model = models.Ingredient
+        fields = ('name',)

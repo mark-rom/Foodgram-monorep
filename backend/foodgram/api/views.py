@@ -6,18 +6,17 @@ from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
 from rest_framework import response, status
 from rest_framework.decorators import action
-from rest_framework.filters import SearchFilter
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import (IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
 
 from recipes import models
-from users.models import User, Subscription
+from users.models import Subscription, User
 
 from . import permissions, serializers
-from .filters import RecipeFilter
-from .shopping_list_pdf import get_pdf
+from .filters import IngredientSearchFilter, RecipeFilter
+from .shopping_list_pdf import get_shopping_list
 
 
 class BaseListRetrieveViewSet(
@@ -28,6 +27,7 @@ class BaseListRetrieveViewSet(
 
 
 class FoodgramUserViewSet(UserViewSet):
+    """Вьюсет для работы с эндпоинтом /users/ и производными."""
 
     @action(
         methods=['get'], detail=False,
@@ -35,8 +35,8 @@ class FoodgramUserViewSet(UserViewSet):
         permission_classes=[IsAuthenticated]
         )
     def subscriptions(self, request):
-        # здесь можно сделать select_related, наверное
-        # для поля following.recipes
+        """Метод получения списка интересующих авторов."""
+
         user_following_qs = request.user.follower.all()
         qs = self.paginate_queryset(user_following_qs)
         serializer = serializers.UserSubscriptionSerializer(
@@ -54,6 +54,7 @@ class FoodgramUserViewSet(UserViewSet):
         permission_classes=[IsAuthenticated]
     )
     def subscribe(self, request, id):
+        """Метод подписки на автора или отписки."""
 
         following = get_object_or_404(User, pk=id)
 
@@ -86,23 +87,30 @@ class FoodgramUserViewSet(UserViewSet):
 
 
 class TagViewSet(BaseListRetrieveViewSet):
+    """Вьюсет для работы с эндпоинтом /tags/ и производными."""
+
     queryset = models.Tag.objects.all()
     serializer_class = serializers.TagSerializer
     pagination_class = None
 
 
 class IngredientViewSet(BaseListRetrieveViewSet):
+    """Вьюсет для работы с эндпоинтом /ingredients/ и производными.
+    Реализован поиск по вхождению в начало названия."""
+
     queryset = models.Ingredient.objects.all()
     serializer_class = serializers.IngredientSerializer
     pagination_class = None
-    filter_backends = [SearchFilter]
-    search_fields = ['^name']
+    filter_backends = [DjangoFilterBackend]
+    filterset_class = IngredientSearchFilter
 
 
 class RecipeViewSet(ModelViewSet):
-    queryset = models.Recipe.objects.prefetch_related(
-        'ingredients', 'tags'
-    ).all()
+    """Вьюсет для работы с эндпоинтом /recipes/ и производными.
+    Реализована пагинация, пермишены, фильтр по автору, тегам,
+    нахождению в списке покупок или избранном."""
+
+    queryset = models.Recipe.objects.all()
     permission_classes = [
         IsAuthenticatedOrReadOnly,
         permissions.AuthorOrReadOnly,
@@ -116,8 +124,6 @@ class RecipeViewSet(ModelViewSet):
         return serializers.WriteRecipeSerializer
 
     def perform_create(self, serializer):
-        # удалить .is_valid()
-        serializer.is_valid(raise_exception=True)
         serializer.save(author=self.request.user)
 
     def __add_recipe(self, recipe, user, serializer):
@@ -152,10 +158,10 @@ class RecipeViewSet(ModelViewSet):
         permission_classes=[IsAuthenticated]
     )
     def download_shopping_cart(self, request):
+        """Метод для получения списке рецептов в формате PDF."""
+
         user = request.user
 
-        # queryset of dicts | название, ед. измер. и количество
-        # всех уникальных ингредиентов из корзины пользователя
         shopping_list = user.shoppingcart_related.values(
             'recipe__ingredients__name',
             'recipe__ingredients__measurement_unit',
@@ -165,11 +171,11 @@ class RecipeViewSet(ModelViewSet):
                 distinct=True
             )
         )
-        byte_pdf = get_pdf(shopping_list)
+
+        bytes_file = get_shopping_list(shopping_list)
 
         return FileResponse(
-            byte_pdf, as_attachment=True,
-            filename='shopping_list', content_type='application/pdf'
+            bytes_file, as_attachment=True, filename='shopping_list.pdf'
         )
 
     @action(
@@ -177,6 +183,7 @@ class RecipeViewSet(ModelViewSet):
         detail=True, permission_classes=[IsAuthenticated]
     )
     def shopping_cart(self, request, pk):
+        """Метод добавления рецептов в список покупок и удаления из него."""
 
         recipe = get_object_or_404(models.Recipe, id=pk)
         user = request.user
@@ -193,6 +200,7 @@ class RecipeViewSet(ModelViewSet):
         permission_classes=[IsAuthenticated]
     )
     def favorite(self, request, pk):
+        """Метод добавления избранных рецептов и их удаления."""
 
         recipe = get_object_or_404(models.Recipe, id=pk)
         user = request.user
