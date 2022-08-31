@@ -1,3 +1,6 @@
+from re import fullmatch
+
+from django.core.exceptions import ValidationError
 from django.db import models
 
 from users.models import User
@@ -25,6 +28,10 @@ class Tag(models.Model):
 
     def __str__(self):
         return self.name
+
+    def clean(self) -> None:
+        if not fullmatch('#[0-9A-Fa-f]{6}', self.color):
+            raise ValidationError('Цвет должен быть в HEX.')
 
 
 class Ingredient(models.Model):

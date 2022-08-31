@@ -11,6 +11,7 @@ class TagAdmin(admin.ModelAdmin):
 class IngredientAdmin(admin.ModelAdmin):
     model = models.Ingredient
     list_display = ['pk', 'name', 'measurement_unit']
+    search_fields = ['name']
 
 
 class IngredientInline(admin.TabularInline):
@@ -43,6 +44,7 @@ class RecipeAdmin(admin.ModelAdmin):
                     'name', 'image',
                     'text', 'cooking_time'
                     ]
+    list_filter = ['author', 'name', 'tags']
 
 
 class ShoppongCartAdmin(admin.ModelAdmin):
