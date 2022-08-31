@@ -110,7 +110,11 @@ class RecipeViewSet(ModelViewSet):
     Реализована пагинация, пермишены, фильтр по автору, тегам,
     нахождению в списке покупок или избранном."""
 
-    queryset = models.Recipe.objects.all()
+    queryset = models.Recipe.objects.select_related(
+        'author'
+    ).prefetch_related(
+        'ingredients', 'tags'
+    ).all()
     permission_classes = [
         IsAuthenticatedOrReadOnly,
         permissions.AuthorOrReadOnly,
