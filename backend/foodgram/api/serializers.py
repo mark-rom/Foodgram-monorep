@@ -2,9 +2,8 @@ from re import fullmatch
 from typing import List
 
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from drf_base64.fields import Base64ImageField
-from rest_framework import serializers
+from rest_framework import serializers, status
 
 from recipes import models
 from users.models import Subscription, User
@@ -115,7 +114,12 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
 
         if user.is_authenticated:
-            return user.favorites_related.filter(recipe=obj).exists()
+            try:
+                return obj.is_favorited
+            except AttributeError:
+                return models.Favorites.objects.filter(
+                    recipe=obj, user=user
+                ).exists()
 
         return False
 
@@ -125,7 +129,12 @@ class ReadRecipeSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
 
         if user.is_authenticated:
-            return user.shoppingcart_related.filter(recipe=obj).exists()
+            try:
+                return obj.is_in_shopping_cart
+            except AttributeError:
+                return models.ShoppingCart.objects.filter(
+                    recipe=obj, user=user
+                ).exists()
 
         return False
 
@@ -155,12 +164,21 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
 
         bulk_list = [None] * len(ingredients)
 
+        ingredients_ids = [ingredient.get('id') for ingredient in ingredients]
+        ingredients_in_bulk = models.Ingredient.objects.in_bulk(
+            ingredients_ids
+        )
+
         for num, ingredient in enumerate(ingredients):
+            if ingredient.get('id') not in ingredients_in_bulk:
+                raise serializers.ValidationError(
+                    f"Ингредиент с id: {ingredient.get('id')} не найден",
+                    status.HTTP_400_BAD_REQUEST
+                )
+
             new_instance = models.RecipeIngredient(
                 recipe=recipe,
-                ingredient=get_object_or_404(
-                    models.Ingredient, id=ingredient.get('id')
-                ),
+                ingredient=ingredients_in_bulk[ingredient.get('id')],
                 amount=ingredient.get('amount')
             )
             bulk_list[num] = new_instance
@@ -173,18 +191,19 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
         ingredients = validated_data.pop('ingredients')
         tags = validated_data.pop('tags')
 
-        new_recipe = models.Recipe.objects.create(**validated_data)
+        new_recipe = super().create(validated_data)
 
         bulk_list = [None] * len(ingredients)
 
         self._ingredietns_bulk_create(new_recipe, ingredients)
 
         bulk_list = [None] * len(tags)
+        tags = models.Tag.objects.in_bulk(tags)
 
-        for num, tag in enumerate(tags):
+        for num, tag in enumerate(tags.values()):
             new_instance = models.RecipeTag(
                 recipe=new_recipe,
-                tag=get_object_or_404(models.Tag, id=tag)
+                tag=tag
             )
             bulk_list[num] = new_instance
 
@@ -198,8 +217,6 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
         tags = validated_data.pop('tags')
         ingredients = validated_data.pop('ingredients')
 
-        # Вот это нужно делать в одной "автономной" транзакции
-        # также подумать над созданием объектов через bulk_create
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -209,13 +226,12 @@ class WriteRecipeSerializer(serializers.ModelSerializer):
         self._ingredietns_bulk_create(instance, ingredients)
 
         bulk_list = [None] * len(tags)
+        tags = models.Tag.objects.in_bulk(tags)
 
-        for num, tag in enumerate(tags):
-            new_tag = get_object_or_404(models.Tag, id=tag)
-            bulk_list[num] = new_tag
+        for num, tag in enumerate(tags.values()):
+            bulk_list[num] = tag
 
         instance.tags.set(bulk_list)
-        # Вот до сюда
 
         return super().update(
             instance=instance, validated_data=validated_data
@@ -308,7 +324,12 @@ class UserSubscriptionSerializer(serializers.ModelSerializer):
         return obj.user == self.context['request'].user
 
     def get_recipes_count(self, obj):
-        return obj.following.recipes.count()
+        try:
+            return obj.recipes_count
+        except AttributeError:
+            return models.Recipe.objects.filter(
+                author=obj.following
+            ).count()
 
     def get_recipes(self, obj):
         request = self.context['request']

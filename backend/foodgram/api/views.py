@@ -1,5 +1,4 @@
-from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Sum
+from django.db.models import Count, Exists, OuterRef, Sum
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -37,7 +36,9 @@ class FoodgramUserViewSet(UserViewSet):
     def subscriptions(self, request):
         """Метод получения списка интересующих авторов."""
 
-        user_following_qs = request.user.follower.all()
+        user_following_qs = request.user.follower.all().annotate(
+            recipes_count=Count('following__recipes')
+        )
         qs = self.paginate_queryset(user_following_qs)
         serializer = serializers.UserSubscriptionSerializer(
             qs, many=True,
@@ -50,29 +51,11 @@ class FoodgramUserViewSet(UserViewSet):
         return self.get_paginated_response(serializer.data)
 
     @action(
-        methods=['post', 'delete'], detail=True,
+        methods=['post'], detail=True,
         permission_classes=[IsAuthenticated]
     )
     def subscribe(self, request, id):
         """Метод подписки на автора или отписки."""
-
-        following = get_object_or_404(User, pk=id)
-
-        if request.method == 'DELETE':
-
-            instance = Subscription.objects.filter(
-                user=request.user, following=following
-            )
-
-            if instance.exists():
-
-                instance.delete()
-                return response.Response(status=status.HTTP_204_NO_CONTENT)
-
-            return response.Response(
-                {"error": "Вы не были подписаны на этого пользователя"},
-                status=status.HTTP_400_BAD_REQUEST
-            )
 
         serializer = serializers.SubscriptionSerializer(
             data={'following': id}, context={'request': self.request}
@@ -83,6 +66,25 @@ class FoodgramUserViewSet(UserViewSet):
 
         return response.Response(
             serializer.data, status=status.HTTP_201_CREATED
+        )
+
+    @subscribe.mapping.delete
+    def subscribe_delete(self, request, id):
+
+        following = get_object_or_404(User, pk=id)
+
+        instance = Subscription.objects.filter(
+            user=request.user, following=following
+        )
+
+        if instance.exists():
+
+            instance.delete()
+            return response.Response(status=status.HTTP_204_NO_CONTENT)
+
+        return response.Response(
+            {"error": "Вы не были подписаны на этого пользователя"},
+            status=status.HTTP_400_BAD_REQUEST
         )
 
 
@@ -110,17 +112,34 @@ class RecipeViewSet(ModelViewSet):
     Реализована пагинация, пермишены, фильтр по автору, тегам,
     нахождению в списке покупок или избранном."""
 
-    queryset = models.Recipe.objects.select_related(
-        'author'
-    ).prefetch_related(
-        'ingredients', 'tags'
-    ).all()
     permission_classes = [
         IsAuthenticatedOrReadOnly,
         permissions.AuthorOrReadOnly,
     ]
     filter_backends = [DjangoFilterBackend]
     filterset_class = RecipeFilter
+
+    def get_queryset(self):
+
+        user = self.request.user
+
+        is_favorited_qs = models.Favorites.objects.filter(
+            user=user,
+            recipe_id=OuterRef('pk')
+        )
+        shopping_cart_qs = models.ShoppingCart.objects.filter(
+            user=user,
+            recipe_id=OuterRef('pk')
+        )
+
+        return models.Recipe.objects.select_related(
+            'author'
+        ).prefetch_related(
+            'ingredients', 'tags'
+        ).annotate(
+            is_favorited=Exists(is_favorited_qs),
+            is_in_shopping_cart=Exists(shopping_cart_qs)
+        ).all()
 
     def get_serializer_class(self):
         if self.action in ('list', 'retrieve'):
@@ -149,7 +168,7 @@ class RecipeViewSet(ModelViewSet):
         try:
             instance = related_manager.get(recipe=recipe)
 
-        except ObjectDoesNotExist:
+        except models.Recipe.DoesNotExist:
             return response.Response(
                 {"no_recipe": "Вы не доавляли этот рецепт"},
                 status=status.HTTP_400_BAD_REQUEST
