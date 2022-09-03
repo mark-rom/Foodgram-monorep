@@ -133,4 +133,5 @@ dmypy.json
 
 media/
 foodgram/static/
+sent_emails/
 .vscode/
