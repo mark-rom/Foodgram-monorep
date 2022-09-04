@@ -3,9 +3,8 @@ from typing import List
 
 from django.db import transaction
 from drf_base64.fields import Base64ImageField
-from rest_framework import serializers, status
-
 from recipes import models
+from rest_framework import serializers, status
 from users.models import Subscription, User
 
 

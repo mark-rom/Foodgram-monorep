@@ -3,14 +3,13 @@ from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
 from djoser.views import UserViewSet
+from recipes import models
 from rest_framework import response, status
 from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.permissions import (IsAuthenticated,
                                         IsAuthenticatedOrReadOnly)
 from rest_framework.viewsets import GenericViewSet, ModelViewSet
-
-from recipes import models
 from users.models import Subscription, User
 
 from . import permissions, serializers
@@ -32,7 +31,7 @@ class FoodgramUserViewSet(UserViewSet):
         methods=['get'], detail=False,
         filter_backends=[DjangoFilterBackend],
         permission_classes=[IsAuthenticated]
-        )
+    )
     def subscriptions(self, request):
         """Метод получения списка интересующих авторов."""
 
