@@ -135,3 +135,4 @@ media/
 foodgram/static/
 sent_emails/
 .vscode/
+*.dump

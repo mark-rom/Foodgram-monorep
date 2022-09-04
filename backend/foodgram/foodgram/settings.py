@@ -26,11 +26,13 @@ load_dotenv(dotenv_path=dot_env_path)
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv('SECRET_KEY')
+HOST_IP = os.getenv('HOST_IP')
+HOST_URL = os.getenv('HOST_URL')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = [HOST_IP, HOST_URL, 'localhost', '127.0.0.1']
 
 
 # Application definition
