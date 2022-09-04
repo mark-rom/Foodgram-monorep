@@ -1,4 +1,4 @@
-from django.db.models import Count, Exists, OuterRef, Sum
+from django.db.models import Count, Exists, OuterRef, Sum, Value
 from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django_filters.rest_framework import DjangoFilterBackend
@@ -121,6 +121,16 @@ class RecipeViewSet(ModelViewSet):
     def get_queryset(self):
 
         user = self.request.user
+
+        if user.is_anonymous:
+            return models.Recipe.objects.select_related(
+                'author'
+            ).prefetch_related(
+                'ingredients', 'tags'
+            ).annotate(
+                is_favorited=Value(False),
+                is_in_shopping_cart=Value(False)
+            ).all()
 
         is_favorited_qs = models.Favorites.objects.filter(
             user=user,
