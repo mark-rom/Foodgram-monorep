@@ -39,7 +39,7 @@ class Command(BaseCommand):
 
     def row_process(self, num, row):
         data = {}
-        data['id'] = num
+        # data['id'] = num
         data['name'] = row[0]
         data['measurement_unit'] = row[1]
         self.insert_to_db(data)
