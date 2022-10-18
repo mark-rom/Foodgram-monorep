@@ -30,7 +30,7 @@ HOST_IP = os.getenv('HOST_IP')
 HOST_URL = os.getenv('HOST_URL')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = [HOST_IP, HOST_URL, 'localhost', '127.0.0.1']
 

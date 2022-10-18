@@ -1,16 +1,16 @@
-![example workflow](https://github.com/mark-rom/yamdb_final/actions/workflows/foodgram_workflow.yml/badge.svg)
+![example workflow](https://github.com/mark-rom/Foodgram-monorep/actions/workflows/foodgram_workflow.yml/badge.svg)
 
 ## Foodgram ##
-### Описание: ###
+### Description: ###
 
-Foodgram (REST API) - сайт, на котором пользователи могут публиковать собственные рецепты, добавлять чужие рецепты в избранное и подписываться на публикации других авторов. Сервис "Список покупок" позволяет пользователям создавать список продуктов, которые нужно купить, для приготовления выбранных блюд.
+Foodgram (REST API) is a website where users can publish their recipes, add other recipes to favourites and subscribe to other users. The shopping cart (Список покупок) service allows downloading a list of goods required for selected dishes.
 
-Проект доступен по адресу: http://foodgram.servehttp.com/
-Доступ администратора стандратный: admin/admin
+The project is available here: http://foodgram.servehttp.com/
+Admins credentials: admin/admin
 
-[Документация](http://foodgram.servehttp.com//api/docs/)
+[Documentation](http://foodgram.servehttp.com//api/docs/) only in Russian, sorry :(
 
-## Технологии ##
+## Technologies ##
 - Python 3.10
 - Django 4.0.5
 - Django REST Framework 3.13.1
@@ -23,29 +23,29 @@ ____
 
 ## Установка и запуск локально ##
 
-### Клонируйте репозиторий: ###
-    git@github.com:mark-rom/foodgram-project-react.git
+### Clone repo: ###
+    git@github.com:mark-rom/Foodgram-monorep.git
 
-### Перейдите в репозиторий в командной строке: ###
+### Go to new dir using command line:: ###
     cd /infra/
 
-### Создайте .env файл и наполните его: ###
+### Create .env file and fill it: ###
     touch .env
-Структура наполнения .env файла представлена в файле .env.example
+.env structure is in infra/.env.example
 
-### Запустите docker-compose в detach-режиме: ###
+### Launch docker-compose: ###
     docker-compose up -d
 ____
 
-## Внутри контейнера web ##
+## Inside the web container ##
 
-#### Выполните миграции: ####
+#### Migrate: ####
     docker-compose exec web python3 manage.py migrate
   
-#### Заполните базу данных из csv файлов: ####
+#### Fill db from .csv file: ####
     docker-compose exec web python3 manage.py populate_ingredient ingredients.csv
   
-#### Создайте суперюзера: ####
+#### Create superuser: ####
     docker-compose exec web python3 manage.py cratesuperuser
 
-Теперь сервис доступен для работы на вашем компьютере по адресу http://localhost/, а админка – http://localhost/admin/
+Now service is available on your computer at http://localhost/, admin panel is at http://localhost/admin/
