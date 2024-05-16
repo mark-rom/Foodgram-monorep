@@ -21,7 +21,7 @@ Admins credentials: admin/admin
 - Github Workflows
 ____
 
-## Установка и запуск локально ##
+## Installation and Launch locally ##
 
 ### Clone repo: ###
     git@github.com:mark-rom/Foodgram-monorep.git
